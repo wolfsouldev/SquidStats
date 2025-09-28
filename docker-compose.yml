@@ -1,14 +1,39 @@
-version: '3.8'
-
 services:
+  squid:
+    build:
+      context: .
+      dockerfile: Dockerfile-Squid
+      args:
+        SQUID_VERSION: "7.1"
+        DISTRO: "jammy"
+    container_name: squid_proxy
+    ports:
+      - "3128:3128"
+    volumes:
+      - ./squid_logs:/var/log/squid
+      - ./squid_cache:/var/spool/squid
+      - ./squid.conf:/etc/squid/squid.conf
+    networks:
+      - squidnet
+    restart: unless-stopped
+
   squidstats:
     build: .
     container_name: squidstats_app
     ports:
-      - "5000:5000"
+      - "5001:5000"
     env_file:
       - .env
+    environment:
+      - FLASK_APP=app:app
     volumes:
       - .:/app
-      - /home/manuel/Downloads/logs:/logs
+    depends_on:
+      - squid
+    networks:
+      - squidnet
     restart: unless-stopped
+
+networks:
+  squidnet:
+    driver: bridge
