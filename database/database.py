@@ -20,6 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import declarative_base, sessionmaker
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Cargar variables de entorno desde .env
 load_dotenv()
@@ -97,6 +98,31 @@ class SystemMetrics(Base):
     net_sent_bytes_sec = Column(BigInteger, nullable=False)
     net_recv_bytes_sec = Column(BigInteger, nullable=False)
     created_at = Column(DateTime, default=datetime.now)
+
+
+class Role(Base):
+    __tablename__ = "roles"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+
+
+class AuthUser(Base):
+    __tablename__ = "auth_users"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(255), nullable=False, unique=True)
+    password_hash = Column(String(255), nullable=False)
+    role_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.now)
+
+    def set_password(self, password: str):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password: str) -> bool:
+        try:
+            return check_password_hash(self.password_hash, password)
+        except Exception:
+            return False
 
 
 def get_database_url() -> str:
@@ -458,6 +484,84 @@ def migrate_database():
         )
     finally:
         logger.setLevel(original_level)
+
+
+def ensure_roles_and_admin():
+    """Ensure the default roles exist and create an initial admin user from env if missing."""
+    engine = get_engine()
+    session = None
+    try:
+        Session = sessionmaker(bind=engine)
+        session = Session()
+
+        # Create tables if not exist
+        Role.__table__.create(engine, checkfirst=True)
+        AuthUser.__table__.create(engine, checkfirst=True)
+
+        # Default roles
+        default_roles = [
+            ("SuperAdministrador", "Nivel máximo de acceso."),
+            (
+                "Administrador de Red",
+                "Responsable de la supervisión técnica y configuración de alertas.",
+            ),
+            (
+                "Analista de Seguridad",
+                "Acceso a logs y creación de reportes de incidentes.",
+            ),
+        ]
+
+        for name, desc in default_roles:
+            existing = session.query(Role).filter(Role.name == name).first()
+            if not existing:
+                session.add(Role(name=name, description=desc))
+
+        session.commit()
+
+        # Ensure at least one SuperAdministrador exists. Use SEED_USER_NAME/SEED_USER_PASS
+        seed_user = os.getenv("SEED_USER_NAME") or os.getenv("ADMIN_USER") or "admin"
+        seed_pass = os.getenv("SEED_USER_PASS") or os.getenv("ADMIN_PASS") or "admin"
+
+        super_role = (
+            session.query(Role).filter(Role.name == "SuperAdministrador").first()
+        )
+        super_exists = False
+        if super_role:
+            # Check if any user has this role
+            super_user = (
+                session.query(AuthUser)
+                .filter(AuthUser.role_id == super_role.id)
+                .first()
+            )
+            if super_user:
+                super_exists = True
+
+        if not super_exists and seed_user:
+            existing_seed = (
+                session.query(AuthUser).filter(AuthUser.username == seed_user).first()
+            )
+            if existing_seed:
+                # If user exists but not super, promote
+                if super_role and existing_seed.role_id != super_role.id:
+                    existing_seed.role_id = super_role.id
+                    session.add(existing_seed)
+                    session.commit()
+                    logger.info(
+                        f"Promoted existing user to SuperAdministrador: {seed_user}"
+                    )
+            else:
+                role_id = super_role.id if super_role else None
+                new_user = AuthUser(username=seed_user, role_id=role_id)
+                new_user.set_password(seed_pass)
+                session.add(new_user)
+                session.commit()
+                logger.info(f"Created seeded SuperAdministrador user: {seed_user}")
+
+    except Exception as e:
+        logger.error(f"Error ensuring roles/admin: {e}")
+    finally:
+        if session:
+            session.close()
 
 
 def _column_needs_migration(current_column, expected_spec, db_type):

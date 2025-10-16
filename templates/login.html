@@ -1,0 +1,145 @@
+{% extends 'base_plain.html' %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 py-12 px-4 relative overflow-hidden">
+    <!-- Animated background elements -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute top-20 left-10 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div class="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
+    </div>
+
+    <div class="max-w-5xl w-full grid grid-cols-1 md:grid-cols-2 gap-12 items-center relative z-10">
+
+        <!-- Left: Branding / info -->
+        <div class="hidden md:flex flex-col items-start justify-center px-8 space-y-6">
+            <div class="mb-4 transform hover:scale-105 transition-transform duration-300">
+                <div class="w-24 h-24 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-blue-600 flex items-center justify-center shadow-2xl shadow-blue-500/50 relative">
+                    <div class="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 opacity-0 hover:opacity-100 transition-opacity duration-300 blur-sm"></div>
+                    <i class="fas fa-chart-line text-white text-3xl relative z-10"></i>
+                </div>
+            </div>
+            
+            <div class="space-y-4">
+                <h1 class="text-5xl font-extrabold text-white mb-3 tracking-tight">
+                    Squid<span class="text-cyan-400">Stats</span>
+                </h1>
+                <p class="text-lg text-slate-300 leading-relaxed max-w-md">
+                    Panel de administración y análisis de logs de Squid. Accede con tu cuenta administrativa para gestionar y monitorear tu red.
+                </p>
+                
+                <div class="flex items-center gap-4 pt-4">
+                    <div class="flex items-center gap-2 text-slate-400">
+                        <i class="fas fa-shield-alt text-cyan-400"></i>
+                        <span class="text-sm">Seguro</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-slate-400">
+                        <i class="fas fa-bolt text-cyan-400"></i>
+                        <span class="text-sm">Rápido</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-slate-400">
+                        <i class="fas fa-chart-bar text-cyan-400"></i>
+                        <span class="text-sm">Analítico</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Login form -->
+        <div class="mx-auto w-full max-w-md">
+            <div class="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 md:p-10 border border-white/20 transform hover:scale-[1.01] transition-all duration-300">
+                <!-- Mobile logo -->
+                <div class="md:hidden flex justify-center mb-6">
+                    <div class="w-16 h-16 rounded-xl bg-gradient-to-br from-cyan-400 via-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
+                        <i class="fas fa-chart-line text-white text-xl"></i>
+                    </div>
+                </div>
+
+                <div class="text-center mb-8">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-2">Bienvenido</h2>
+                    <p class="text-slate-500 text-sm">Ingresa tus credenciales para continuar</p>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                <div class="space-y-2 mb-6">
+                    {% for category, msg in messages %}
+                    <div class="p-4 rounded-xl text-sm text-white bg-gradient-to-r from-red-500 to-red-600 shadow-lg flex items-center gap-3 animate-shake">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span>{{ msg }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                <form method="POST" action="{{ url_for('auth.login') }}" class="space-y-6">
+                    {% if request.args.get('next') %}
+                    <input type="hidden" name="next" value="{{ request.args.get('next') }}" />
+                    {% endif %}
+
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                            <i class="fas fa-user text-slate-400 text-xs"></i>
+                            Usuario
+                        </label>
+                        <input 
+                            name="username" 
+                            required 
+                            autofocus 
+                            placeholder="Ingresa tu usuario"
+                            class="w-full px-4 py-3.5 rounded-xl border-2 border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-200 hover:border-slate-300" 
+                        />
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                            <i class="fas fa-lock text-slate-400 text-xs"></i>
+                            Contraseña
+                        </label>
+                        <input 
+                            name="password" 
+                            type="password" 
+                            required 
+                            placeholder="Ingresa tu contraseña"
+                            class="w-full px-4 py-3.5 rounded-xl border-2 border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-200 hover:border-slate-300" 
+                        />
+                    </div>
+
+                    <button 
+                        type="submit"
+                        class="w-full mt-8 inline-flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-cyan-500 via-blue-500 to-blue-600 text-white rounded-xl font-bold text-lg hover:shadow-2xl hover:shadow-blue-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group"
+                    >
+                        <span>Iniciar Sesión</span>
+                        <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform duration-200"></i>
+                    </button>
+
+                    <div class="text-center text-sm text-slate-500 pt-4 border-t border-slate-100">
+                        <a href="/" class="hover:text-cyan-600 transition-colors duration-200 font-medium inline-flex items-center gap-2">
+                            <i class="fas fa-arrow-left text-xs"></i>
+                            Volver al inicio
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Footer info -->
+            <div class="text-center mt-6 text-slate-400 text-xs">
+                <p>© 2025 SquidStats. Todos los derechos reservados.</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+    }
+    
+    .animate-shake {
+        animation: shake 0.5s ease-in-out;
+    }
+</style>
+{% endblock %}

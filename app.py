@@ -4,9 +4,12 @@ from dotenv import load_dotenv
 from flask import Flask
 from flask_apscheduler import APScheduler
 from flask_socketio import SocketIO
+from flask_login import LoginManager
+import os
 
 from config import Config, logger
 from database.database import migrate_database
+from database.database import ensure_roles_and_admin
 from parsers.log import process_logs
 from routes import register_routes
 from routes.main_routes import initialize_proxy_detection
@@ -35,6 +38,54 @@ def create_app():
     app = Flask(__name__, static_folder="./static")
     app.config.from_object(Config())
 
+    # Initialize Flask-Login
+    login_manager = LoginManager()
+    login_manager.login_view = "auth.login"
+    login_manager.init_app(app)
+
+    # Simple user loader that checks ADMIN_USER env var
+    # User loader that loads AuthUser from the database by numeric id
+    @login_manager.user_loader
+    def load_user(user_id):
+        try:
+            # user_id is stored as a string by Flask-Login; convert to int
+            uid = int(user_id)
+        except Exception:
+            return None
+
+        try:
+            from database.database import get_session, AuthUser
+
+            session = get_session()
+            try:
+                u = session.query(AuthUser).filter(AuthUser.id == uid).first()
+                if not u:
+                    return None
+
+                class UserObj:
+                    def __init__(self, id_, username, role_id):
+                        self.id = str(id_)
+                        self.username = username
+                        self.role_id = role_id
+
+                    def is_active(self):
+                        return True
+
+                    def is_authenticated(self):
+                        return True
+
+                    def is_anonymous(self):
+                        return False
+
+                    def get_id(self):
+                        return self.id
+
+                return UserObj(u.id, u.username, u.role_id)
+            finally:
+                session.close()
+        except Exception:
+            return None
+
     # Initialize extensions
     scheduler = APScheduler()
     scheduler.init_app(app)
@@ -49,6 +100,12 @@ def create_app():
     # Initialize proxy detection
     initialize_proxy_detection()
 
+    # Ensure roles and initial admin user exist
+    try:
+        ensure_roles_and_admin()
+    except Exception:
+        logger.exception("Failed to ensure roles/admin at startup")
+
     # Configure response headers
     @app.after_request
     def set_response_headers(response):
@@ -56,6 +113,20 @@ def create_app():
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
         return response
+
+    # Enforce login for all routes except allowed ones
+    from flask import request, redirect
+    from flask_login import current_user
+
+    @app.before_request
+    def require_login():
+        # Allow static files, login page, and API endpoints
+        public_prefixes = ("/static/", "/login", "/api/", "/health")
+        path = request.path
+        if any(path.startswith(p) for p in public_prefixes):
+            return None
+        if not current_user.is_authenticated:
+            return redirect("/login")
 
     return app, scheduler
 
@@ -111,7 +182,6 @@ def main():
         f"Starting SquidStats application in {'debug' if debug_mode else 'production'} mode"
     )
 
-    # Determine port from environment (APP_PORT) or fallback to 5000
     try:
         port = int(os.getenv("APP_PORT", os.getenv("PORT", "5000")))
     except ValueError:
@@ -119,9 +189,14 @@ def main():
     logger.info(
         f"Starting SquidStats on 0.0.0.0:{port} (debug={'on' if debug_mode else 'off'})"
     )
-     
+
     socketio.run(
-        app, debug=debug_mode, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True ,use_reloader=True
+        app,
+        debug=debug_mode,
+        host="0.0.0.0",
+        port=port,
+        allow_unsafe_werkzeug=True,
+        use_reloader=True,
     )
 
 
