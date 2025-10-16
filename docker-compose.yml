@@ -1,3 +1,5 @@
+version: '2.4'
+
 services:
   squid:
     build:
@@ -13,26 +15,33 @@ services:
       - ./squid_logs:/var/log/squid
       - ./squid_cache:/var/spool/squid
       - ./squid.conf:/etc/squid/squid.conf
+    healthcheck:
+      test: ["CMD", "/usr/lib/squid/squidclient", "-p", "3128", "mgr:info"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - squidnet
     restart: unless-stopped
 
-  squidstats:
-    build: .
-    container_name: squidstats_app
-    ports:
-      - "5001:5000"
-    env_file:
-      - .env
-    environment:
-      - FLASK_APP=app:app
-    volumes:
-      - .:/app
-    depends_on:
-      - squid
-    networks:
-      - squidnet
-    restart: unless-stopped
+  # squidstats:
+  #   build: .
+  #   container_name: squidstats_app
+  #   ports:
+  #     - "5001:5001"
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - FLASK_APP=app:app
+  #   volumes:
+  #     - .:/app
+  #   depends_on:
+  #     squid:
+  #       condition: service_healthy
+  #   networks:
+  #     - squidnet
+  #   restart: unless-stopped
 
 networks:
   squidnet:

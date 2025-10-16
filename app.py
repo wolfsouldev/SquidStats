@@ -111,8 +111,17 @@ def main():
         f"Starting SquidStats application in {'debug' if debug_mode else 'production'} mode"
     )
 
+    # Determine port from environment (APP_PORT) or fallback to 5000
+    try:
+        port = int(os.getenv("APP_PORT", os.getenv("PORT", "5000")))
+    except ValueError:
+        port = 5001
+    logger.info(
+        f"Starting SquidStats on 0.0.0.0:{port} (debug={'on' if debug_mode else 'off'})"
+    )
+     
     socketio.run(
-        app, debug=debug_mode, host="0.0.0.0", port=5000, allow_unsafe_werkzeug=True
+        app, debug=debug_mode, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True ,use_reloader=True
     )
 
 

@@ -6,6 +6,10 @@ instance/*
 *.db
 *.db-journal
 
+squid_cache/
+squid_config/
+squid_logs/
+
 ### Python template
 # Byte-compiled / optimized / DLL files
 __pycache__/
