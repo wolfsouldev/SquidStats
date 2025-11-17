@@ -128,6 +128,30 @@ def create_app():
         if not current_user.is_authenticated:
             return redirect("/login")
 
+    # Expose admin permission to templates
+    @app.context_processor
+    def inject_admin_permission():
+        try:
+            from database.database import get_session, Role
+            if not current_user or not getattr(current_user, "is_authenticated", False):
+                return {"can_view_admin": False}
+
+            session = get_session()
+            try:
+                role = (
+                    session.query(Role).filter(Role.id == current_user.role_id).first()
+                )
+                if not role:
+                    return {"can_view_admin": False}
+                return {
+                    "can_view_admin": role.name
+                    in ("SuperAdministrador", "Administrador de Red")
+                }
+            finally:
+                session.close()
+        except Exception:
+            return {"can_view_admin": False}
+
     return app, scheduler
 
 

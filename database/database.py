@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from sqlalchemy import (
-    BigInteger,
+    BigInteger, 
     Column,
     DateTime,
     Integer,
@@ -556,6 +556,37 @@ def ensure_roles_and_admin():
                 session.add(new_user)
                 session.commit()
                 logger.info(f"Created seeded SuperAdministrador user: {seed_user}")
+
+        # Also ensure there's at least one 'Administrador de Red' seeded if env vars provided
+        netadmin_name = os.getenv("SEED_NETADMIN_NAME") or os.getenv("NETADMIN_USER")
+        netadmin_pass = os.getenv("SEED_NETADMIN_PASS") or os.getenv("NETADMIN_PASS")
+        if netadmin_name and netadmin_pass:
+            net_role = (
+                session.query(Role).filter(Role.name == "Administrador de Red").first()
+            )
+            existing_net = (
+                session.query(AuthUser)
+                .filter(AuthUser.username == netadmin_name)
+                .first()
+            )
+            if existing_net:
+                # promote to network admin if different
+                if net_role and existing_net.role_id != net_role.id:
+                    existing_net.role_id = net_role.id
+                    session.add(existing_net)
+                    session.commit()
+                    logger.info(
+                        f"Promoted existing user to Administrador de Red: {netadmin_name}"
+                    )
+            else:
+                role_id = net_role.id if net_role else None
+                new_net = AuthUser(username=netadmin_name, role_id=role_id)
+                new_net.set_password(netadmin_pass)
+                session.add(new_net)
+                session.commit()
+                logger.info(
+                    f"Created seeded Administrador de Red user: {netadmin_name}"
+                )
 
     except Exception as e:
         logger.error(f"Error ensuring roles/admin: {e}")

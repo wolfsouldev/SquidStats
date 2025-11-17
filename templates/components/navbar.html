@@ -35,12 +35,14 @@
         <i class="fas fa-user-friends text-base"></i>
         <span class="font-medium">Usuarios</span>
       </a>
+      {% if can_view_admin %}
       <a href="/admin"
         class="flex items-center gap-2 px-4 py-2 text-gray-300 rounded-lg font-medium text-sm transition-all duration-300 relative hover:text-cyan-300 hover:bg-white/5 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-cyan-500/10"
         data-tooltip="Panel de administración">
         <i class="fas fa-user-shield text-base"></i>
         <span class="font-medium">Admin</span>
       </a>
+      {% endif %}
       <a href="/reports"
         class="flex items-center gap-2 px-4 py-2 text-gray-300 rounded-lg font-medium text-sm transition-all duration-300 relative hover:text-cyan-300 hover:bg-white/5 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-cyan-500/10">
         <i class="fas fa-chart-simple text-base"></i>
