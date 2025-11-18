@@ -336,11 +336,9 @@ def create_user():
 
 
 @admin_bp.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
-@admin_required
 def edit_user(user_id):
     session = get_session()
     try:
-        print("User ID to edit:", user_id)  # Línea de depuración añadida
         user = (
             session.query(AuthUser)
             .options(joinedload(AuthUser.role))
@@ -349,9 +347,20 @@ def edit_user(user_id):
         )
         if not user:
             flash("Usuario no encontrado", "error")
-            return redirect(url_for("admin.manage_users"))
-        print(user)
-        # Verificar si es SuperAdministrador y no es el usuario actual
+            return redirect(url_for("main.index"))
+
+        # Verificar permisos de acceso
+        current_role = (
+            session.query(Role).filter(Role.id == current_user.role_id).first()
+        )
+        is_super_admin = current_role and current_role.name == "SuperAdministrador"
+
+        # Un usuario normal solo puede editar su propio perfil
+        if not is_super_admin and user_id != current_user.id:
+            flash("No tienes permiso para editar este usuario", "error")
+            return redirect(url_for("main.index"))
+
+        # SuperAdmin no puede editar su propio rol
         if (
             user.role
             and user.role.name == "SuperAdministrador"
@@ -364,19 +373,8 @@ def edit_user(user_id):
             username = request.form["username"]
             password = request.form.get("password")
 
-            # Verificar si el usuario actual puede cambiar roles
-            current_role_session = get_session()
-            try:
-                current_role = (
-                    current_role_session.query(Role)
-                    .filter(Role.id == current_user.role_id)
-                    .first()
-                )
-                can_change_roles = (
-                    current_role and current_role.name == "SuperAdministrador"
-                )
-            finally:
-                current_role_session.close()
+            # Verificar si el usuario puede cambiar roles
+            can_change_roles = is_super_admin
 
             if user.id == current_user.id:
                 # No permitir cambiar rol propio
@@ -402,9 +400,27 @@ def edit_user(user_id):
                 user.set_password(password)
             session.commit()
             flash("Usuario actualizado exitosamente", "success")
-            return redirect(url_for("admin.manage_users"))
+
+            # Si es el usuario editando su propio perfil, regresar al inicio
+            # Si es un admin editando otro usuario, ir a la lista de usuarios
+            if user_id == current_user.id:
+                return redirect(url_for("main.index"))
+            else:
+                return redirect(url_for("admin.manage_users"))
         roles = session.query(Role).filter(Role.name != "SuperAdministrador").all()
-        return render_template("admin/user_form.html", user=user, roles=roles)
+        # Si el usuario es SuperAdmin editando su propio perfil, incluir su rol
+        if (
+            user.id == current_user.id
+            and user.role
+            and user.role.name == "SuperAdministrador"
+        ):
+            roles = session.query(Role).all()
+        return render_template(
+            "admin/user_form.html",
+            user=user,
+            roles=roles,
+            can_change_role=(is_super_admin and user_id != current_user.id),
+        )
     finally:
         session.close()
 

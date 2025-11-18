@@ -64,7 +64,7 @@ def create_app():
 
                 class UserObj:
                     def __init__(self, id_, username, role_id):
-                        self.id = str(id_)
+                        self.id = id_
                         self.username = username
                         self.role_id = role_id
 
@@ -78,7 +78,7 @@ def create_app():
                         return False
 
                     def get_id(self):
-                        return self.id
+                        return str(self.id)
 
                 return UserObj(u.id, u.username, u.role_id)
             finally:
