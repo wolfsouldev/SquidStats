@@ -2,6 +2,63 @@
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
+    <!-- Modal Personalizado para Activar/Desactivar -->
+    <div id="statusModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50"
+        style="display: none;">
+        <div class="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4">
+            <!-- Header del Modal -->
+            <div id="modalHeader" class="px-6 py-4 border-b-2">
+                <h2 id="modalTitle" class="text-2xl font-bold"></h2>
+            </div>
+
+            <!-- Contenido del Modal -->
+            <div class="px-6 py-6">
+                <p id="modalMessage" class="text-gray-700 mb-4 leading-relaxed"></p>
+
+                <!-- Información adicional para desactivar -->
+                <div id="deactivateInfo" class="hidden bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                    <div class="flex">
+                        <div class="shrink-0">
+                            <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-yellow-700">
+                                <strong>Importante:</strong> El usuario no podrá hacer login hasta que sea reactivado.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información adicional para activar -->
+                <div id="activateInfo" class="hidden bg-green-50 border-l-4 border-green-400 p-4 mb-4">
+                    <div class="flex">
+                        <div class="shrink-0">
+                            <i class="fas fa-check-circle text-green-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-green-700">
+                                <strong>Nota:</strong> El usuario podrá volver a hacer login inmediatamente.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <p id="username" class="text-gray-600 text-sm mt-4 font-medium"></p>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end gap-3">
+                <button onclick="closeStatusModal()"
+                    class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 font-semibold transition duration-200">
+                    Cancelar
+                </button>
+                <button id="confirmBtn" onclick="confirmStatusChange()"
+                    class="px-4 py-2 text-white rounded-lg font-semibold transition duration-200">
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="bg-white rounded-lg shadow-lg p-6">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold text-gray-800">Gestión de Usuarios</h1>
@@ -70,16 +127,13 @@
                                 class="text-indigo-600 hover:text-indigo-900 mr-3">
                                 <i class="fas fa-edit"></i> Editar
                             </a>
-                            <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}"
-                                class="inline"
-                                onsubmit="return confirm('¿Estás seguro de que quieres {% if user.is_active %}desactivar{% else %}activar{% endif %} este usuario?')">
-                                <button type="submit"
-                                    class="{% if user.is_active %}text-red-600 hover:text-red-900{% else %}text-green-600 hover:text-green-900{% endif %}">
-                                    <i
-                                        class="fas {% if user.is_active %}fa-times-circle{% else %}fa-check-circle{% endif %}"></i>
-                                    {% if user.is_active %}Desactivar{% else %}Activar{% endif %}
-                                </button>
-                            </form>
+                            <button
+                                onclick="openStatusModal({{ user.id }}, '{{ user.username }}', {{ user.is_active }})"
+                                class="{% if user.is_active %}text-red-600 hover:text-red-900{% else %}text-green-600 hover:text-green-900{% endif %} bg-none border-none cursor-pointer">
+                                <i
+                                    class="fas {% if user.is_active %}fa-times-circle{% else %}fa-check-circle{% endif %}"></i>
+                                {% if user.is_active %}Desactivar{% else %}Activar{% endif %}
+                            </button>
                             {% endif %}
                         </td>
                     </tr>
@@ -96,4 +150,83 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+    let currentUserId = null;
+    let currentUsername = null;
+    let isCurrentlyActive = null;
+
+    function openStatusModal(userId, username, isActive) {
+        currentUserId = userId;
+        currentUsername = username;
+        isCurrentlyActive = isActive;
+
+        const modal = document.getElementById('statusModal');
+        const title = document.getElementById('modalTitle');
+        const message = document.getElementById('modalMessage');
+        const userDisplay = document.getElementById('username');
+        const deactivateInfo = document.getElementById('deactivateInfo');
+        const activateInfo = document.getElementById('activateInfo');
+        const confirmBtn = document.getElementById('confirmBtn');
+        const modalHeader = document.getElementById('modalHeader');
+
+        if (isActive) {
+            // Desactivar usuario
+            title.textContent = '⚠️ Desactivar Usuario';
+            message.textContent = '¿Estás seguro de que deseas desactivar este usuario?';
+            userDisplay.textContent = `Usuario: ${username}`;
+            deactivateInfo.classList.remove('hidden');
+            activateInfo.classList.add('hidden');
+            confirmBtn.textContent = 'Desactivar';
+            confirmBtn.className = 'px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg font-semibold transition duration-200';
+            modalHeader.classList.add('border-red-300');
+            modalHeader.classList.remove('border-green-300');
+        } else {
+            // Activar usuario
+            title.textContent = '✓ Reactivar Usuario';
+            message.textContent = '¿Deseas reactivar este usuario?';
+            userDisplay.textContent = `Usuario: ${username}`;
+            deactivateInfo.classList.add('hidden');
+            activateInfo.classList.remove('hidden');
+            confirmBtn.textContent = 'Activar';
+            confirmBtn.className = 'px-4 py-2 text-white bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition duration-200';
+            modalHeader.classList.add('border-green-300');
+            modalHeader.classList.remove('border-red-300');
+        }
+
+        modal.style.display = 'flex';
+    }
+
+    function closeStatusModal() {
+        document.getElementById('statusModal').style.display = 'none';
+        currentUserId = null;
+        currentUsername = null;
+        isCurrentlyActive = null;
+    }
+
+    function confirmStatusChange() {
+        if (currentUserId === null) return;
+
+        // Crear un formulario temporal y enviarlo
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/users/${currentUserId}/delete`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    // Cerrar modal al hacer clic fuera de él
+    document.getElementById('statusModal').addEventListener('click', function (e) {
+        if (e.target === this) {
+            closeStatusModal();
+        }
+    });
+
+    // Cerrar modal con tecla Escape
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            closeStatusModal();
+        }
+    });
+</script>
 {% endblock %}
