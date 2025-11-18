@@ -7,9 +7,10 @@ from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from sqlalchemy import (
-    BigInteger, 
+    BigInteger,
     Column,
     DateTime,
+    ForeignKey,
     Integer,
     String,
     Text,
@@ -19,7 +20,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.ext.declarative import declared_attr
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # Cargar variables de entorno desde .env
@@ -112,8 +113,11 @@ class AuthUser(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(255), nullable=False, unique=True)
     password_hash = Column(String(255), nullable=False)
-    role_id = Column(Integer, nullable=True)
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=True)
+    is_active = Column(Integer, default=1, nullable=False)  # 1 = activo, 0 = inactivo
     created_at = Column(DateTime, default=datetime.now)
+
+    role = relationship("Role", backref="users")
 
     def set_password(self, password: str):
         self.password_hash = generate_password_hash(password)

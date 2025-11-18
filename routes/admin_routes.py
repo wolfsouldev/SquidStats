@@ -1,4 +1,5 @@
 import os
+from functools import wraps
 
 from flask import (
     Blueprint,
@@ -10,14 +11,37 @@ from flask import (
     request,
     url_for,
 )
+from flask_login import login_required, current_user
 
 from config import logger
+from database.database import get_session, AuthUser, Role
+from sqlalchemy.orm import joinedload
 from utils.admin import SquidConfigManager
 
 admin_bp = Blueprint("admin", __name__)
 
 # Instancia global del manager
 config_manager = SquidConfigManager()
+
+
+def admin_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        session = get_session()
+        try:
+            role = session.query(Role).filter(Role.id == current_user.role_id).first()
+            if not role or role.name not in (
+                "SuperAdministrador",
+                "Administrador de Red",
+            ):
+                flash("Acceso denegado", "error")
+                return redirect(url_for("main.index"))
+        finally:
+            session.close()
+        return f(*args, **kwargs)
+
+    return decorated_function
 
 
 @admin_bp.route("/")
@@ -246,3 +270,196 @@ def reload_squid():
         if show_details:
             resp["details"] = str(e)
         return jsonify(resp), 500
+
+
+@admin_bp.route("/users")
+@admin_required
+def manage_users():
+    session = get_session()
+    try:
+        # Mostrar todos los usuarios (activos e inactivos)
+        users = session.query(AuthUser).options(joinedload(AuthUser.role)).all()
+        roles = session.query(Role).filter(Role.name != "SuperAdministrador").all()
+        return render_template("admin/users.html", users=users, roles=roles)
+    finally:
+        session.close()
+
+
+@admin_bp.route("/users/new", methods=["GET", "POST"])
+@admin_required
+def create_user():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        session = get_session()
+        try:
+            # Verificar si el usuario actual puede cambiar roles
+            current_role = (
+                session.query(Role).filter(Role.id == current_user.role_id).first()
+            )
+            can_change_roles = (
+                current_role and current_role.name == "SuperAdministrador"
+            )
+
+            if can_change_roles:
+                role_id = request.form["role_id"]
+            else:
+                # Asignar rol por defecto
+                default_role = (
+                    session.query(Role)
+                    .filter(Role.name == "Analista de Seguridad")
+                    .first()
+                )
+                role_id = default_role.id if default_role else None
+
+            existing = (
+                session.query(AuthUser).filter(AuthUser.username == username).first()
+            )
+            if existing:
+                flash("Usuario ya existe", "error")
+                return redirect(url_for("admin.create_user"))
+            user = AuthUser(username=username, role_id=role_id)
+            user.set_password(password)
+            session.add(user)
+            session.commit()
+            flash("Usuario creado exitosamente", "success")
+            return redirect(url_for("admin.manage_users"))
+        finally:
+            session.close()
+    session = get_session()
+    try:
+        # Excluir SuperAdministrador de la lista de roles disponibles
+        roles = session.query(Role).filter(Role.name != "SuperAdministrador").all()
+        return render_template("admin/user_form.html", user=None, roles=roles)
+    finally:
+        session.close()
+
+
+@admin_bp.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
+@admin_required
+def edit_user(user_id):
+    session = get_session()
+    try:
+        print("User ID to edit:", user_id)  # Línea de depuración añadida
+        user = (
+            session.query(AuthUser)
+            .options(joinedload(AuthUser.role))
+            .filter(AuthUser.id == user_id)
+            .first()
+        )
+        if not user:
+            flash("Usuario no encontrado", "error")
+            return redirect(url_for("admin.manage_users"))
+        print(user)
+        # Verificar si es SuperAdministrador y no es el usuario actual
+        if (
+            user.role
+            and user.role.name == "SuperAdministrador"
+            and user.id != current_user.id
+        ):
+            flash("No se puede editar al SuperAdministrador", "error")
+            return redirect(url_for("admin.manage_users"))
+
+        if request.method == "POST":
+            username = request.form["username"]
+            password = request.form.get("password")
+
+            # Verificar si el usuario actual puede cambiar roles
+            current_role_session = get_session()
+            try:
+                current_role = (
+                    current_role_session.query(Role)
+                    .filter(Role.id == current_user.role_id)
+                    .first()
+                )
+                can_change_roles = (
+                    current_role and current_role.name == "SuperAdministrador"
+                )
+            finally:
+                current_role_session.close()
+
+            if user.id == current_user.id:
+                # No permitir cambiar rol propio
+                role_id = None
+            else:
+                if can_change_roles:
+                    role_id = request.form.get("role_id")
+                else:
+                    role_id = None
+
+            existing = (
+                session.query(AuthUser)
+                .filter(AuthUser.username == username, AuthUser.id != user_id)
+                .first()
+            )
+            if existing:
+                flash("Usuario ya existe", "error")
+                return redirect(url_for("admin.edit_user", user_id=user_id))
+            user.username = username
+            if role_id:
+                user.role_id = role_id
+            if password:
+                user.set_password(password)
+            session.commit()
+            flash("Usuario actualizado exitosamente", "success")
+            return redirect(url_for("admin.manage_users"))
+        roles = session.query(Role).filter(Role.name != "SuperAdministrador").all()
+        return render_template("admin/user_form.html", user=user, roles=roles)
+    finally:
+        session.close()
+
+
+@admin_bp.route("/users/<int:user_id>/delete", methods=["POST"])
+@admin_required
+def delete_user(user_id):
+    session = get_session()
+    try:
+        user = (
+            session.query(AuthUser)
+            .options(joinedload(AuthUser.role))
+            .filter(AuthUser.id == user_id)
+            .first()
+        )
+        if not user:
+            flash("Usuario no encontrado", "error")
+            return redirect(url_for("admin.manage_users"))
+
+        # Verificar si es SuperAdministrador
+        if user.role and user.role.name == "SuperAdministrador":
+            flash("No se puede desactivar al SuperAdministrador", "error")
+            return redirect(url_for("admin.manage_users"))
+
+        # Alternar estado del usuario (activo/inactivo)
+        if user.is_active:
+            user.is_active = 0
+            message = "Usuario desactivado exitosamente"
+        else:
+            user.is_active = 1
+            message = "Usuario activado exitosamente"
+
+        session.commit()
+        flash(message, "success")
+        return redirect(url_for("admin.manage_users"))
+    finally:
+        session.close()
+
+
+@admin_bp.route("/change_password", methods=["POST"])
+@login_required
+def change_password():
+    new_password = request.form["new_password"]
+    session = get_session()
+    try:
+        user = session.query(AuthUser).filter(AuthUser.id == current_user.id).first()
+        if user:
+            user.set_password(new_password)
+            session.commit()
+            flash("Contraseña cambiada exitosamente", "success")
+        else:
+            flash("Usuario no encontrado", "error")
+    except Exception as e:
+        logger.exception("Error cambiando contraseña")
+        flash("Error al cambiar la contraseña", "error")
+    finally:
+        session.close()
+    return redirect(request.referrer or url_for("main.index"))
