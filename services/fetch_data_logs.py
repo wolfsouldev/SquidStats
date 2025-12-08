@@ -68,6 +68,342 @@ def get_users_logs(
     per_page: int = 15,
     search: str | None = None,
 ) -> dict[str, Any]:
+    # # Array de 20 usuarios de ejemplo
+    # sample_users = [
+    #     {
+    #         "user_id": 1,
+    #         "username": "jsmith",
+    #         "ip": "192.168.1.10",
+    #         "logs": [
+    #             {
+    #                 "url": "http://example.com",
+    #                 "response": 200,
+    #                 "request_count": 45,
+    #                 "data_transmitted": 2048000,
+    #             },
+    #             {
+    #                 "url": "http://google.com",
+    #                 "response": 200,
+    #                 "request_count": 32,
+    #                 "data_transmitted": 1024000,
+    #             },
+    #         ],
+    #         "total_requests": 77,
+    #         "total_data": 3072000,
+    #     },
+    #     {
+    #         "user_id": 2,
+    #         "username": "ajones",
+    #         "ip": "192.168.1.11",
+    #         "logs": [
+    #             {
+    #                 "url": "http://github.com",
+    #                 "response": 200,
+    #                 "request_count": 23,
+    #                 "data_transmitted": 512000,
+    #             },
+    #         ],
+    #         "total_requests": 23,
+    #         "total_data": 512000,
+    #     },
+    #     {
+    #         "user_id": 3,
+    #         "username": "mbrown",
+    #         "ip": "192.168.1.12",
+    #         "logs": [
+    #             {
+    #                 "url": "http://stackoverflow.com",
+    #                 "response": 200,
+    #                 "request_count": 89,
+    #                 "data_transmitted": 4096000,
+    #             },
+    #         ],
+    #         "total_requests": 89,
+    #         "total_data": 4096000,
+    #     },
+    #     {
+    #         "user_id": 4,
+    #         "username": "rgarcia",
+    #         "ip": "192.168.1.13",
+    #         "logs": [
+    #             {
+    #                 "url": "http://youtube.com",
+    #                 "response": 200,
+    #                 "request_count": 156,
+    #                 "data_transmitted": 10240000,
+    #             },
+    #         ],
+    #         "total_requests": 156,
+    #         "total_data": 10240000,
+    #     },
+    #     {
+    #         "user_id": 5,
+    #         "username": "pmiller",
+    #         "ip": "192.168.1.14",
+    #         "logs": [
+    #             {
+    #                 "url": "http://linkedin.com",
+    #                 "response": 200,
+    #                 "request_count": 34,
+    #                 "data_transmitted": 1536000,
+    #             },
+    #         ],
+    #         "total_requests": 34,
+    #         "total_data": 1536000,
+    #     },
+    #     {
+    #         "user_id": 6,
+    #         "username": "ldavis",
+    #         "ip": "192.168.1.15",
+    #         "logs": [
+    #             {
+    #                 "url": "http://twitter.com",
+    #                 "response": 200,
+    #                 "request_count": 67,
+    #                 "data_transmitted": 2560000,
+    #             },
+    #         ],
+    #         "total_requests": 67,
+    #         "total_data": 2560000,
+    #     },
+    #     {
+    #         "user_id": 7,
+    #         "username": "crodriguez",
+    #         "ip": "192.168.1.16",
+    #         "logs": [
+    #             {
+    #                 "url": "http://facebook.com",
+    #                 "response": 200,
+    #                 "request_count": 45,
+    #                 "data_transmitted": 3072000,
+    #             },
+    #         ],
+    #         "total_requests": 45,
+    #         "total_data": 3072000,
+    #     },
+    #     {
+    #         "user_id": 8,
+    #         "username": "mwilson",
+    #         "ip": "192.168.1.17",
+    #         "logs": [
+    #             {
+    #                 "url": "http://wikipedia.org",
+    #                 "response": 200,
+    #                 "request_count": 23,
+    #                 "data_transmitted": 1024000,
+    #             },
+    #         ],
+    #         "total_requests": 23,
+    #         "total_data": 1024000,
+    #     },
+    #     {
+    #         "user_id": 9,
+    #         "username": "jlee",
+    #         "ip": "192.168.1.18",
+    #         "logs": [
+    #             {
+    #                 "url": "http://amazon.com",
+    #                 "response": 200,
+    #                 "request_count": 78,
+    #                 "data_transmitted": 5120000,
+    #             },
+    #         ],
+    #         "total_requests": 78,
+    #         "total_data": 5120000,
+    #     },
+    #     {
+    #         "user_id": 10,
+    #         "username": "ktaylor",
+    #         "ip": "192.168.1.19",
+    #         "logs": [
+    #             {
+    #                 "url": "http://ebay.com",
+    #                 "response": 200,
+    #                 "request_count": 34,
+    #                 "data_transmitted": 1024000,
+    #             },
+    #         ],
+    #         "total_requests": 34,
+    #         "total_data": 1024000,
+    #     },
+    #     {
+    #         "user_id": 11,
+    #         "username": "rthomas",
+    #         "ip": "192.168.1.20",
+    #         "logs": [
+    #             {
+    #                 "url": "http://reddit.com",
+    #                 "response": 200,
+    #                 "request_count": 112,
+    #                 "data_transmitted": 6144000,
+    #             },
+    #         ],
+    #         "total_requests": 112,
+    #         "total_data": 6144000,
+    #     },
+    #     {
+    #         "user_id": 12,
+    #         "username": "dwhite",
+    #         "ip": "192.168.1.21",
+    #         "logs": [
+    #             {
+    #                 "url": "http://instagram.com",
+    #                 "response": 200,
+    #                 "request_count": 89,
+    #                 "data_transmitted": 4608000,
+    #             },
+    #         ],
+    #         "total_requests": 89,
+    #         "total_data": 4608000,
+    #     },
+    #     {
+    #         "user_id": 13,
+    #         "username": "jharris",
+    #         "ip": "192.168.1.22",
+    #         "logs": [
+    #             {
+    #                 "url": "http://pinterest.com",
+    #                 "response": 200,
+    #                 "request_count": 45,
+    #                 "data_transmitted": 2048000,
+    #             },
+    #         ],
+    #         "total_requests": 45,
+    #         "total_data": 2048000,
+    #     },
+    #     {
+    #         "user_id": 14,
+    #         "username": "cmartin",
+    #         "ip": "192.168.1.23",
+    #         "logs": [
+    #             {
+    #                 "url": "http://netflix.com",
+    #                 "response": 200,
+    #                 "request_count": 234,
+    #                 "data_transmitted": 15360000,
+    #             },
+    #         ],
+    #         "total_requests": 234,
+    #         "total_data": 15360000,
+    #     },
+    #     {
+    #         "user_id": 15,
+    #         "username": "sthompson",
+    #         "ip": "192.168.1.24",
+    #         "logs": [
+    #             {
+    #                 "url": "http://twitch.tv",
+    #                 "response": 200,
+    #                 "request_count": 167,
+    #                 "data_transmitted": 9216000,
+    #             },
+    #         ],
+    #         "total_requests": 167,
+    #         "total_data": 9216000,
+    #     },
+    #     {
+    #         "user_id": 16,
+    #         "username": "bgarcia",
+    #         "ip": "192.168.1.25",
+    #         "logs": [
+    #             {
+    #                 "url": "http://dropbox.com",
+    #                 "response": 200,
+    #                 "request_count": 56,
+    #                 "data_transmitted": 2560000,
+    #             },
+    #         ],
+    #         "total_requests": 56,
+    #         "total_data": 2560000,
+    #     },
+    #     {
+    #         "user_id": 17,
+    #         "username": "kmartinez",
+    #         "ip": "192.168.1.26",
+    #         "logs": [
+    #             {
+    #                 "url": "http://slack.com",
+    #                 "response": 200,
+    #                 "request_count": 134,
+    #                 "data_transmitted": 5632000,
+    #             },
+    #         ],
+    #         "total_requests": 134,
+    #         "total_data": 5632000,
+    #     },
+    #     {
+    #         "user_id": 18,
+    #         "username": "pjohnson",
+    #         "ip": "192.168.1.27",
+    #         "logs": [
+    #             {
+    #                 "url": "http://zoom.us",
+    #                 "response": 200,
+    #                 "request_count": 89,
+    #                 "data_transmitted": 3584000,
+    #             },
+    #         ],
+    #         "total_requests": 89,
+    #         "total_data": 3584000,
+    #     },
+    #     {
+    #         "user_id": 19,
+    #         "username": "dlindsey",
+    #         "ip": "192.168.1.28",
+    #         "logs": [
+    #             {
+    #                 "url": "http://atlassian.com",
+    #                 "response": 200,
+    #                 "request_count": 67,
+    #                 "data_transmitted": 2560000,
+    #             },
+    #         ],
+    #         "total_requests": 67,
+    #         "total_data": 2560000,
+    #     },
+    #     {
+    #         "user_id": 20,
+    #         "username": "ewalker",
+    #         "ip": "192.168.1.29",
+    #         "logs": [
+    #             {
+    #                 "url": "http://notion.so",
+    #                 "response": 200,
+    #                 "request_count": 45,
+    #                 "data_transmitted": 1536000,
+    #             },
+    #         ],
+    #         "total_requests": 45,
+    #         "total_data": 1536000,
+    #     },
+    # ]
+
+    # # Filtrar por búsqueda si se proporciona
+    # if search:
+    #     search_lc = search.lower()
+    #     filtered_users = [u for u in sample_users if search_lc in u["username"].lower()]
+    # else:
+    #     filtered_users = sample_users
+
+    # # Calcular total y paginación
+    # total = len(filtered_users)
+    # total_pages = (total + per_page - 1) // per_page if per_page else 1
+
+    # # Aplicar paginación
+    # offset = (page - 1) * per_page
+    # if per_page:
+    #     paginated_users = filtered_users[offset : offset + per_page]
+    # else:
+    #     paginated_users = filtered_users
+
+    # return {
+    #     "users": paginated_users,
+    #     "total": total,
+    #     "page": page,
+    #     "per_page": per_page,
+    #     "total_pages": total_pages,
+    # }
+
     try:
         if not date_suffix:
             date_suffix = datetime.now().strftime("%Y%m%d")
@@ -249,15 +585,19 @@ def get_metrics_for_date(selected_date: date):
     code_labels = [str(code) for code, _ in http_codes]
     code_data = [count for _, count in http_codes]
     code_colors = [
-        "#3B82F6"
-        if 200 <= int(code) < 300
-        else "#F59E0B"
-        if 300 <= int(code) < 400
-        else "#EF4444"
-        if 400 <= int(code) < 500
-        else "#8B5CF6"
-        if 500 <= int(code) < 600
-        else "#10B981"
+        (
+            "#3B82F6"
+            if 200 <= int(code) < 300
+            else (
+                "#F59E0B"
+                if 300 <= int(code) < 400
+                else (
+                    "#EF4444"
+                    if 400 <= int(code) < 500
+                    else "#8B5CF6" if 500 <= int(code) < 600 else "#10B981"
+                )
+            )
+        )
         for code in code_labels
     ]
 

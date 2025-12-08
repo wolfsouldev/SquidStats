@@ -51,6 +51,7 @@ class DatabaseManager:
 # Constants for fields and batch
 BATCH_SIZE = 500
 MAX_RETRIES = 3
+MAX_CONSECUTIVE_BATCH_FAILURES = 3  # Stop parser if commits fail too many times
 
 # Log parsing mode controlled by .env LOG_FORMAT: 'DETAILED' or 'DEFAULT'
 LOG_FORMAT = getattr(Config, "LOG_FORMAT", "DETAILED").upper()
@@ -152,9 +153,11 @@ def parse_log_line(line):
                 # Keep current behavior: if '-', set None
                 "username": parts[2] if parts[2] != "-" else None,
                 "url": parts[6],
-                "response": int(parts[3].split("/")[-1])
-                if "/" in parts[3] and parts[3].split("/")[-1].isdigit()
-                else 0,
+                "response": (
+                    int(parts[3].split("/")[-1])
+                    if "/" in parts[3] and parts[3].split("/")[-1].isdigit()
+                    else 0
+                ),
                 "data_transmitted": int(parts[4]) if parts[4].isdigit() else 0,
                 "method": parts[5],
                 "status": parts[3],
@@ -317,6 +320,7 @@ def process_logs(log_file):
             logs_to_insert, new_users_to_insert, denied_to_insert = [], [], []
             processed_lines = inserted_logs = inserted_users = inserted_denied = 0
             start_time = time.time()
+            consecutive_batch_failures = 0
 
             def commit_batch():
                 nonlocal inserted_logs, inserted_users, inserted_denied
@@ -358,6 +362,23 @@ def process_logs(log_file):
                         break
                 return False
 
+            def handle_batch_failure(message: str):
+                nonlocal consecutive_batch_failures
+                consecutive_batch_failures += 1
+                logger.error(message)
+                if consecutive_batch_failures >= MAX_CONSECUTIVE_BATCH_FAILURES:
+                    logger.critical(
+                        "Exceeded maximum batch commit failures. Shutting down parser to avoid further corruption."
+                    )
+                    raise SystemExit(
+                        "Exceeded maximum batch commit failures. Process terminated."
+                    )
+
+            def reset_batch_failures():
+                nonlocal consecutive_batch_failures
+                if consecutive_batch_failures:
+                    consecutive_batch_failures = 0
+
             with open(log_file, encoding="utf-8", errors="replace") as f:
                 f.seek(last_position)
                 current_position = last_position
@@ -381,11 +402,12 @@ def process_logs(log_file):
                         denied_to_insert.append(denied_entry)
                         if len(denied_to_insert) >= BATCH_SIZE:
                             if commit_batch():
+                                reset_batch_failures()
                                 logger.info(
                                     f"Batch denied_logs inserted successfully. Records: {BATCH_SIZE}"
                                 )
                             else:
-                                logger.error(
+                                handle_batch_failure(
                                     "Error committing denied batch. Continuing with next batch"
                                 )
                         continue
@@ -408,8 +430,10 @@ def process_logs(log_file):
                             user_cache[user_key] = None
                             user_id = None
                     if user_id is None:
-                        if not commit_batch():
-                            logger.error(
+                        if commit_batch():
+                            reset_batch_failures()
+                        else:
+                            handle_batch_failure(
                                 "Critical error committing batch. Aborting batch"
                             )
                             continue
@@ -437,14 +461,20 @@ def process_logs(log_file):
                         }
                     )
                     if len(logs_to_insert) >= BATCH_SIZE:
-                        if not commit_batch():
-                            logger.error(
+                        if commit_batch():
+                            reset_batch_failures()
+                        else:
+                            handle_batch_failure(
                                 "Error committing batch. Continuing with next batch"
                             )
             # Commit any remaining items that didn't fill a full batch
             if logs_to_insert or new_users_to_insert or denied_to_insert:
-                if not commit_batch():
-                    logger.error("Final commit_batch failed for remaining items")
+                if commit_batch():
+                    reset_batch_failures()
+                else:
+                    handle_batch_failure(
+                        "Final commit_batch failed for remaining items"
+                    )
             if not metadata:
                 metadata = LogMetadata()
                 session.add(metadata)
